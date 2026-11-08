@@ -1,29 +1,34 @@
-import telegram
+"""Minimal Telegram message-forwarding bot template.
 
-# Replace with your bot's API token
-BOT_TOKEN = '6837065222:AAH_CDDdaG1KX3hSMCOQUfRY44MiTx-_hqg'
+Set TELEGRAM_BOT_TOKEN, OWNER_CHAT_ID, and FRIEND_CHAT_ID in the environment
+before running. Never commit bot tokens or private chat identifiers.
+"""
+import os
 
-# Replace with your friend's Telegram user ID
-FRIEND_USER_ID = '1422500920'
+from telegram import Update
+from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
-# Replace with your own Telegram chat ID
-2122187367 = '2122187367'
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+OWNER_CHAT_ID = int(os.environ["OWNER_CHAT_ID"])
+FRIEND_CHAT_ID = int(os.environ["FRIEND_CHAT_ID"])
 
-bot = telegram.Bot(token=BOT_TOKEN)
 
-def handle_message(update, context):
-    message = update.message
+async def forward_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    if message is None or message.text is None:
+        return
 
-    if message.chat_id == FRIEND_USER_ID:  # Check for messages from your friend
-        # Forward friend's message to you (individually)
-        bot.forward_message(chat_id=2122187367, from_chat_id=FRIEND_USER_ID, message_id=message.message_id)
-    else:  # Handle messages from you (the bot owner)
-        # Forward your message to your friend
-        bot.send_message(chat_id=FRIEND_USER_ID, text=message.text)  # Use send_message for direct chat
+    if message.chat_id == FRIEND_CHAT_ID:
+        await message.forward(chat_id=OWNER_CHAT_ID)
+    elif message.chat_id == OWNER_CHAT_ID:
+        await context.bot.send_message(chat_id=FRIEND_CHAT_ID, text=message.text)
 
-updater = telegram.Updater(BOT_TOKEN, use_context=True)
-dispatcher = updater.dispatcher
-dispatcher.add_handler(telegram.MessageHandler(telegram.ext.Filters.text & ~telegram.ext.Filters.command, handle_message))
 
-updater.start_polling()
-updater.idle()
+def main() -> None:
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_messages))
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
